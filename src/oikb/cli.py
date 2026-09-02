@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from email.policy import default
 import os
 import sys
 from pathlib import Path
@@ -43,12 +44,12 @@ def _make_client(url: str | None, token: str | None):
     )
 
 
-def _resolve_connector(source: str, branch: str | None = None, path: str | None = None):
+def _resolve_connector(source: str, branch: str | None = None, path: str | None = None, base: str | None = None):
     """Resolve a source string to the appropriate connector."""
     if source.startswith("github:"):
         from oikb.connectors.github import GitHubConnector, parse_github_source
         parsed = parse_github_source(source)
-        return GitHubConnector(owner=parsed["owner"], repo=parsed["repo"], branch=branch, path=path or parsed.get("path"))
+        return GitHubConnector(owner=parsed["owner"], repo=parsed["repo"], branch=branch, path=path or parsed.get("path"), base=base)
 
     if source.startswith("gitlab:"):
         from oikb.connectors.gitlab import GitLabConnector, parse_gitlab_source
@@ -373,6 +374,7 @@ def _build_cli_filter(max_file_size: str | None):
 @cli.command()
 @click.argument("source", required=False)
 @common_options
+@click.option("--base", default=None, help="Base URL for GitHub sources.")
 @click.option("--branch", default=None, help="Branch for GitHub sources.")
 @click.option("--path", "source_path", default=None, help="Subdirectory within the source.")
 @click.option("--dry-run", is_flag=True, help="Preview changes without uploading.")
@@ -386,6 +388,7 @@ def sync(
     source: str | None,
     url: str | None,
     token: str | None,
+    base: str | None,
     kb: str | None,
     branch: str | None,
     source_path: str | None,
@@ -424,6 +427,7 @@ def sync(
         for entry in entries:
             entry_source = entry.get("source")
             entry_kb = entry.get("kb-id")
+            entry_base = entry.get("base")
             entry_branch = entry.get("branch")
             entry_path = entry.get("path")
             entry_filter = entry.get("filter", {})
@@ -433,7 +437,7 @@ def sync(
                 continue
 
             try:
-                connector = _resolve_connector(entry_source, entry_branch, entry_path)
+                connector = _resolve_connector(entry_source, entry_branch, entry_path, entry_base)
                 client = _make_client(url, token)
 
                 if not quiet:
@@ -501,7 +505,7 @@ def sync(
         sys.exit(1)
 
     try:
-        connector = _resolve_connector(source, branch, source_path)
+        connector = _resolve_connector(source, branch, source_path, base)
     except (FileNotFoundError, ImportError, ValueError) as e:
         click.echo(click.style(f"Error: {e}", fg="red"), err=True)
         sys.exit(1)
@@ -551,6 +555,7 @@ def sync(
 @cli.command()
 @click.argument("source")
 @common_options
+@click.option("--base", default-None, help="Base URL for GitHub sources.")
 @click.option("--branch", default=None, help="Branch for GitHub sources.")
 @click.option("--path", "source_path", default=None, help="Subdirectory within the source.")
 @click.option("-v", "--verbose", is_flag=True, help="Show detailed output.")
@@ -560,6 +565,7 @@ def diff(
     source: str,
     url: str | None,
     token: str | None,
+    base: str | None,
     kb: str | None,
     branch: str | None,
     source_path: str | None,
@@ -573,7 +579,7 @@ def diff(
     from oikb.sync import run_sync
 
     try:
-        connector = _resolve_connector(source, branch, source_path)
+        connector = _resolve_connector(source, branch, source_path, base)
     except (FileNotFoundError, ImportError, ValueError) as e:
         click.echo(click.style(f"Error: {e}", fg="red"), err=True)
         sys.exit(1)

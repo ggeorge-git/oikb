@@ -29,12 +29,14 @@ class GitHubConnector(BaseConnector):
         self,
         owner: str,
         repo: str,
+        base: str | None = None,
         branch: str | None = None,
         path: str | None = None,
         token: str | None = None,
     ):
         self.owner = owner
         self.repo = repo
+        self.base = base.strip("/") if base else "https://api.github.com"
         self.branch = branch
         self.path = path.strip("/") if path else None
         self._token = token or os.environ.get("GITHUB_TOKEN")
@@ -45,7 +47,7 @@ class GitHubConnector(BaseConnector):
             headers["Authorization"] = f"Bearer {self._token}"
 
         self._http = httpx.Client(
-            base_url="https://api.github.com",
+            base_url=self.base,
             headers=headers,
             timeout=60.0,
         )
