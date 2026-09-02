@@ -11,3 +11,6 @@ build/
 .DS_Store
 Thumbs.db
 uv.lock
+
+# ignore company certs
+certs/*
